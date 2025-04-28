@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bukti Kehadiran Dosen</title>
+  <style>
+    body { font-family: "Times New Roman", Times, serif; background-color: #f2f2f2; margin: 0; padding: 0; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .login-box, .daily-form, .dashboard {
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-top: 50px;
+    }
+    .login-box img { width: 100px; display: block; margin: 0 auto 20px; }
+    .login-box input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    .login-box button { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: center; vertical-align: middle; }
+    th { background-color: #007bff; color: white; }
+    td.preLine { white-space: pre-line; }
+    select, input[type="text"], input[type="file"], textarea { width: 100%; padding: 5px; box-sizing: border-box; }
+    textarea { resize: vertical; }
+    .save-button, .action-buttons { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
+    .save-button button, .action-buttons button { padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+    .save-button button.back, .action-buttons button.back { background-color: #6c757d; }
+    .instruction { font-size: 0.9em; color: #555; margin: -5px 0 10px; }
+    .tambah-button { margin-top: 10px; display: flex; justify-content: flex-end; }
+    .tambah-button button { padding: 8px 16px; background-color: #ffc107; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; }
+    .signature { margin-top: 20px; display: flex; justify-content: space-between; gap: 20px; }
+    .signature div { flex: 1; text-align: center; }
+    .signature label { display: block; margin-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Login Form -->
+    <div class="login-box">
+      <img src="profil-dosen.png" alt="Foto Profil Dosen">
+      <input type="text" id="namaDosen" placeholder="Nama Dosen">
+      <input type="password" id="password" placeholder="Password">
+      <button onclick="login()">Login</button>
+    </div>
+
+    <!-- Daily Input Form -->
+    <div id="daily-form" class="daily-form" style="display:none;">
+      <h2>Input Kehadiran Hari Ini - <span id="tanggalHariIni"></span></h2>
+      <p class="instruction">Tekan tombol <strong>Ctrl</strong> (atau <strong>Cmd</strong>) untuk memilih lebih dari satu jam.</p>
+      <div class="tambah-button">
+        <button onclick="tambahBaris()">+ Tambah Baris</button>
+      </div>
+      <table id="harian-table">
+        <thead>
+          <tr>
+            <th>Jam</th><th>Mata Kuliah</th><th>Kelas</th><th>Semester</th>
+            <th>Pertemuan</th><th>Materi</th><th>SKS Teori</th><th>SKS Praktik</th>
+            <th>Upload Bahan</th><th>Upload Bukti</th>
+          </tr>
+        </thead>
+        <tbody id="harian-body"></tbody>
+      </table>
+      <div class="save-button">
+        <button onclick="simpanHarian()">Simpan Data</button>
+        <button class="back" onclick="kembaliKeLogin()">Back</button>
+      </div>
+    </div>
+
+    <!-- Rekap Kehadiran -->
+    <div id="dashboard" class="dashboard" style="display:none;">
+      <h2>Rekapan Kehadiran Dosen (1 Bulan)</h2>
+      <div id="infoDosen" style="margin-bottom:10px;font-weight:bold;"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>No</th><th>Tanggal</th><th>Jam</th><th>MK</th><th>Kelas</th><th>Sem</th>
+            <th>Pertemuan</th><th>Materi</th><th>SKS T</th><th>SKS P</th><th>Bahan</th><th>Bukti</th><th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="signature">
+        <div><label for="sigDosen">Tanda Tangan Dosen</label><input type="file" id="sigDosen" accept="image/*"></div>
+        <div><label for="sigKaprodi">Tanda Tangan Kaprodi</label><input type="file" id="sigKaprodi" accept="image/*"></div>
+      </div>
+      <div class="action-buttons">
+        <button onclick="kembaliKeForm()" class="back">Back</button>
+        <button onclick="exportToPDF()">Export ke PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- jsPDF & AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    const jamPilihan = [
+      "07.30 - 08.20","08.20 - 09.10","09.10 - 10.00","10.15 - 11.05","11.05 - 11.55",
+      "13.15 - 14.05","14.05 - 14.55","14.55 - 15.45","16.00 - 16.50","16.50 - 17.40",
+      "17.40 - 18.30","18.30 - 19.20","19.20 - 20.10"
+    ];
+    const mataKuliah = [
+      "Pendidikan Agama (Religion Education)",
+      "Pancasila",
+      "Pendidikan Kewarganegaraan (Civic's Education)",
+      "Bahasa Indonesia (Indonesian Language)",
+      "Psikologi Sosial dan Kepribadian (Personality and Social Psychology)",
+      "Matematika Terapan (Applied Mathematics)",
+      "Fisika Terapan (Applied Physics)",
+      "Teknologi Informatika (Information Technology)",
+      "Ilmu Pelayaran Astronomi (Celestial Navigation)",
+      "Ilmu Pelayaran Datar (Terrestrial Navigation)",
+      "Sistem Navigasi elektronik (Electronics Navigation System)",
+      "Penentuan Posisi (Position Fixing / Determination)",
+      "Rancangan Pelayaran (Plan and Voyage and Conduct Navigation)",
+      "Kompas dan Sistem Kemudi (Compass and Steering System)",
+      "Kompas Magnet dan Gyro (Magnetic and Gyro Compass)",
+      "Meteorologi (Meteorology)",
+      "Pengelolaan Meteorologi dan Oceanografi (Forecast Weather and Oceanographic Condition)",
+      "P2TL dan Dinas Jaga (Colreg and Watchkeeping)",
+      "Pengembangan Prosedur dan Penataan Dinas Jaga (Establish Watchkeeping Arrangements and Procedure)",
+      "Prosedur Darurat dan SAR (Emergency Procedures and SAR)",
+      "Bahasa Inggris Maritim (Maritime English)",
+      "Isyarat Visual (Visual Communication)",
+      "Olah Gerak dan Pengendalian Kapal (Ship Manoeuvring and Handling)",
+      "Penanganan, Pengaturan & Pengamanan Muatan (Cargo Handling, Stowage and Securing)",
+      "Tanggung Jawab Penanganan dan Pengaturan Muatan (Responsibility of Cargo Handling and Stowage)",
+      "Kepedulian Lingkungan & Pencegahan Polusi (Environment Awareness and Pollution of Prevention)",
+      "Konstruksi & Stabilitas Kapal (Ship Construction & Stability)",
+      "Kontrol Trim, Stabilitas dan Ketegangan Kapal (Control Trim, Stability and Stress)",
+      "Hukum Maritim (Maritime Law)",
+      "Kepemimpinan & Keterampilan Manajerial (Leadership & Managerial Skill)",
+      "Kepemimpinan & Keterampilan Kerja Tim (Leadership & Teamworking Skills)",
+      "Manajemen Keselamatan dan Keamanan Kapal (Safety and Security Ship Management)",
+      "Kecakapan Bahari (Seamanship)",
+      "Permesinan Kapal dan Perelengkapan Kapal (Ship Machineries and Deck Machineries)",
+      "Sistem Permesinan Kapal (Ship Machineries System)",
+      "Metodologi Penelitian dan Statistik (Research Methodology & Statistics)",
+      "Karya Ilmiah Terapan (Applied Papers)"
+    ];
+
+    function login() {
+      const nama = document.getElementById('namaDosen').value.trim();
+      const pass = document.getElementById('password').value;
+      if (!nama || !pass) return alert('Nama dan password harus diisi.');
+      document.querySelector('.login-box').style.display = 'none';
+      document.getElementById('daily-form').style.display = 'block';
+      document.getElementById('infoDosen').innerText = 'Nama Dosen: ' + nama;
+      document.getElementById('tanggalHariIni').textContent = new Date()
+        .toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'});
+      tambahBaris();
+    }
+
+    function tambahBaris() {
+      const tbody = document.getElementById('harian-body');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><select multiple>${jamPilihan.map(j=>`<option>${j}</option>`).join('')}</select></td>
+        <td><select>${mataKuliah.map(m=>`<option>${m}</option>`).join('')}</select></td>
+        <td><input type="text"></td>
+        <td><input type="text"></td>
+        <td><select>${Array.from({length:16},(_,i)=>`<option>${i+1}</option>`).join('')}</select></td>
+        <td><input type="text"></td>
+        <td><select>${[0,1,2,3].map(i=>`<option>${i}</option>`).join('')}</select></td>
+        <td><select>${[0,1,2,3].map(i=>`<option>${i}</option>`).join('')}</select></td>
+        <td><input type="file"></td>
+        <td><input type="file"></td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function simpanHarian() {
+      const rows = document.querySelectorAll('#harian-body tr');
+      if (!rows.length) return;
+      dataRekap = [];
+      rows.forEach(row => {
+        const cells = row.children;
+        const jam = Array.from(cells[0].querySelectorAll('option:checked'))
+          .map(o=>o.text).join('\n');
+        dataRekap.push({
+          tanggal: document.getElementById('tanggalHariIni').textContent,
+          jam,
+          mk: cells[1].querySelector('select').value,
+          kelas: cells[2].querySelector('input').value,
+          semester: cells[3].querySelector('input').value,
+          pertemuan: cells[4].querySelector('select').value,
+          materi: cells[5].querySelector('input').value,
+          sksT: cells[6].querySelector('select').value,
+          sksP: cells[7].querySelector('select').value,
+          bahan: cells[8].querySelector('input').files[0]?.name||'',
+          bukti: cells[9].querySelector('input').files[0]?.name||''
+        });
+      });
+      tampilkanRekap();
+    }
+
+    function tampilkanRekap() {
+      document.getElementById('daily-form').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      const tb = document.getElementById('table-body'); tb.innerHTML = '';
+      dataRekap.forEach((d,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${d.tanggal}</td>
+          <td class="preLine">${d.jam}</td>
+          <td>${d.mk}</td>
+          <td>${d.kelas}</td>
+          <td>${d.semester}</td>
+          <td>${d.pertemuan}</td>
+          <td>${d.materi}</td>
+          <td>${d.sksT}</td>
+          <td>${d.sksP}</td>
+          <td>${d.bahan}</td>
+          <td>${d.bukti}</td>
+          <td><button onclick="hapusRekap(this)">Hapus</button></td>
+        `;
+        tb.appendChild(tr);
+      });
+    }
+
+    function hapusRekap(btn) {
+      btn.closest('tr').remove();
+    }
+
+    function kembaliKeLogin() {
+      document.getElementById('daily-form').style.display = 'none';
+      document.querySelector('.login-box').style.display = 'block';
+      document.getElementById('harian-body').innerHTML = '';
+    }
+
+    function kembaliKeForm() {
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('daily-form').style.display = 'block';
+      document.getElementById('harian-body').innerHTML = '';
+      tambahBaris();
+    }
+
+    async function exportToPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('p','pt','a4');
+      doc.setFontSize(14);
+      doc.text('Rekapan Kehadiran Dosen', 40, 40);
+      doc.autoTable({ html: '#dashboard table', startY: 60, margin: {left:40,right:40} });
+      doc.save('rekap-kehadiran.pdf');
+    }
+  </script>
+</body>
+</html>
